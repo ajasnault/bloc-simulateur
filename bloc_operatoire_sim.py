@@ -98,6 +98,15 @@ class Config:
     n_scrub: int = None         # instrumentistes présents
     n_anes: int = None          # personnel d'anesthésie présent
 
+    # --- Coûts (CHF) ---
+    cout_minute_chf: float = 15.0
+    # coût all-in du bloc à la minute. Repère suisse : les HUG annoncent 14,66 CHF/min
+    # (rapport d'activité 2018). Dépend du périmètre inclus.
+    majoration_heures_sup: float = 0.35
+    # surcoût des heures supplémentaires (majoration ~25-50% sur le temps au-delà de 16:00)
+    cout_fixe_jour_salle: float = 0.0
+    # optionnel : amortissement équipement + immobilier par salle et par jour (0 par défaut)
+
     # --- Expérimentation ---
     n_replications: int = 40              # répétitions (modèle stochastique)
     base_seed: int = 20240601
@@ -397,13 +406,25 @@ class ORSimulation:
         n_blocked = sum(1 for c in done if c.block_minutes > 0)
 
         # heures sup = minutes-salle occupées au-delà de l'heure de fermeture
+        # (même boucle : minutes_salle_total cumule sans borne, pour le coût)
         overtime = 0.0
+        minutes_salle_total = 0.0
         for c in done:
             end = c.turnover_end if c.turnover_end is not None else c.departure
+            minutes_salle_total += end - c.seize_start
             overtime += max(0.0, end - max(close, c.seize_start))
 
         waits = [c.seize_start - c.arrival for c in done]
         emerg_waits = [c.seize_start - c.arrival for c in done if c.kind == "emergency"]
+
+        # --- coûts (CHF) : calcul par-dessus les KPIs ci-dessus, aucune nouvelle contrainte ---
+        cout_bloc_chf = cfg.cout_minute_chf * minutes_salle_total + cfg.cout_fixe_jour_salle * cfg.n_or
+        cout_heures_sup_chf = overtime * cfg.cout_minute_chf * cfg.majoration_heures_sup
+        cout_total_chf = cout_bloc_chf + cout_heures_sup_chf
+        cout_par_cas_chf = cout_total_chf / max(1, len(done))
+        # gaspillage = sous-ensemble du coût total : temps-salle non productif
+        # (blocage SSPI + salles fermées faute de personnel), PAS un coût en plus.
+        cout_gaspillage_chf = (total_block + self.staff_idle_room_min) * cfg.cout_minute_chf
 
         return {
             "salles": cfg.n_or,
@@ -420,6 +441,12 @@ class ORSimulation:
             "downtime_maint_min": self.downtime_maint,
             "pic_equipes": float(self.peak_teams),
             "salle_min_perdues_personnel": self.staff_idle_room_min,
+            "minutes_salle_total": minutes_salle_total,
+            "cout_bloc_chf": cout_bloc_chf,
+            "cout_heures_sup_chf": cout_heures_sup_chf,
+            "cout_total_chf": cout_total_chf,
+            "cout_par_cas_chf": cout_par_cas_chf,
+            "cout_gaspillage_chf": cout_gaspillage_chf,
         }
 
 
@@ -432,7 +459,9 @@ def run_scenario(cfg: Config) -> dict:
             "cas_bloques", "heures_sup_min", "attente_moy_salle_min",
             "attente_urgences_min", "cas_total",
             "downtime_qa_min", "downtime_maint_min",
-            "pic_equipes", "salle_min_perdues_personnel"]
+            "pic_equipes", "salle_min_perdues_personnel",
+            "minutes_salle_total", "cout_bloc_chf", "cout_heures_sup_chf",
+            "cout_total_chf", "cout_par_cas_chf", "cout_gaspillage_chf"]
     acc = {k: [] for k in keys}
     for r in range(cfg.n_replications):
         m = ORSimulation(cfg, seed=cfg.base_seed + r).run()
