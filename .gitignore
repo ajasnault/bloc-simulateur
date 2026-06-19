@@ -3,3 +3,7 @@ __pycache__/
 .DS_Store
 *.png
 .claude/settings.local.json
+files.zip
+venv/
+.venv/
+env/
