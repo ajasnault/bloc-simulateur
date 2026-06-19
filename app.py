@@ -17,7 +17,28 @@ from charger_donnees_hug import JOURS_OUVRES, FENETRE
 
 N_REPLICATIONS = 25  # volontairement modeste pour rester réactif dans l'UI
 
-st.set_page_config(page_title="Simulateur de bloc opératoire", layout="wide")
+st.set_page_config(page_title="Simulateur de bloc opératoire (démo)", layout="wide")
+
+st.warning(
+    "⚠️ Outil de simulation — démonstration pédagogique. Les données sont "
+    "FICTIVES (synthétiques, calibrées sur des agrégats publics) et ne "
+    "correspondent à aucune donnée réelle des HUG ni d'aucun établissement. "
+    "Les résultats sont des approximations destinées à illustrer des "
+    "arbitrages de planification, et ne doivent pas servir à des décisions "
+    "opérationnelles ou cliniques."
+)
+
+with st.expander("À propos / méthode"):
+    st.markdown(
+        "Le moteur est une **simulation à événements discrets** : il rejoue "
+        "une journée de bloc opératoire (arrivées, chirurgie, réveil en SSPI, "
+        "turnover) sur de nombreuses répétitions tirées aléatoirement, puis "
+        "moyenne les résultats. Les volumes, durées, probabilités et coûts "
+        "réglables dans la barre latérale sont des **estimations plausibles**, "
+        "pas des chiffres mesurés. L'objectif est d'illustrer des arbitrages "
+        "de dimensionnement (salles, SSPI, personnel), pas de prédire une "
+        "réalité opérationnelle précise."
+    )
 
 DEFAULTS = dict(
     niveau=3, n_or=4, n_pacu=3, n_circ=4, n_scrub=4, n_anes=4,
@@ -155,6 +176,7 @@ st.sidebar.caption(
 # ZONE PRINCIPALE
 # ---------------------------------------------------------------------------
 st.title("Simulateur de bloc opératoire")
+st.caption("Prototype pédagogique — données fictives")
 st.caption(f"{N_REPLICATIONS} répétitions par scénario · ouverture 08:00 · fermeture prévue 16:00.")
 
 cfg = construire_config(n_or, n_pacu, n_circ, n_scrub, n_anes, n_elective,
@@ -220,3 +242,9 @@ st.pyplot(fig)
 
 st.subheader("Lecture")
 st.markdown(generer_lecture(r))
+
+st.divider()
+st.caption(
+    "Outil de démonstration pédagogique — données fictives, ne reflète aucun "
+    "établissement réel ni des données HUG."
+)
